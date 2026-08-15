@@ -19,7 +19,10 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9\-]{8,64}$")
 _JOB_MENTION_RE = re.compile(r"job\s*#?\s*(\d+)", re.IGNORECASE)
 _MULTI_JOB_RE = re.compile(
     r"\bother\s+\d+\b|\bother\s+(two|three|jobs)\b|\ball\s+(jobs|three|the\s+jobs)\b|"
-    r"\beach\s+job\b|\bevery\s+job\b|\bboth\s+jobs\b|\bcompare\b|\ball\s+of\s+the\s+jobs\b",
+    r"\beach\s+job\b|\bevery\s+job\b|\bboth\s+jobs\b|\bcompare\b|\ball\s+of\s+the\s+jobs\b|"
+    r"\bwhich\s+job\b|\bwhich\s+jobs\b|\bwhich\s+one\b|\bwhich\s+role\b|\bwhich\s+position\b|"
+    r"\bbest\s+fit\b|\bbest\s+suit(?:s|ed)?\b|\bbest\s+match\b|\bmost\s+suitable\b|"
+    r"\bbetter\s+fit\b|\bbetter\s+suited\b|\brank(?:ed|ing)?\s+(?:the\s+)?jobs\b",
     re.IGNORECASE,
 )
 

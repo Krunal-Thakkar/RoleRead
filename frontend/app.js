@@ -149,10 +149,53 @@ jobUploadBtn.addEventListener("click", async () => {
   }
 });
 
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function renderMarkdown(text) {
+  const lines = text.split("\n").map(escapeHtml);
+  let html = "";
+  let inList = null; // 'ol' or 'ul'
+  let listBuffer = [];
+
+  function closeList() {
+    if (!inList) return;
+    const items = listBuffer.map((s) => `<li>${s}</li>`).join("");
+    html += `<${inList}>${items}</${inList}>`;
+    inList = null;
+    listBuffer = [];
+  }
+
+  for (const raw of lines) {
+    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
+    const ulMatch = line.match(/^[-*]\s+(.*)$/);
+    if (olMatch) {
+      if (inList !== "ol") { closeList(); inList = "ol"; }
+      listBuffer.push(olMatch[2]);
+    } else if (ulMatch) {
+      if (inList !== "ul") { closeList(); inList = "ul"; }
+      listBuffer.push(ulMatch[1]);
+    } else if (line.trim() === "") {
+      closeList();
+    } else {
+      closeList();
+      html += `<p>${line}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
 function addMessage(role, text, sources) {
   const msg = document.createElement("div");
   msg.className = `msg ${role}`;
-  msg.textContent = text;
+  if (role === "assistant") {
+    msg.innerHTML = renderMarkdown(text);
+  } else {
+    msg.textContent = text;
+  }
   if (sources && sources.length) {
     const src = document.createElement("div");
     src.className = "sources";

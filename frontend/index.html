@@ -10,38 +10,42 @@
   <div class="app">
     <header>
       <h1>RoleRead</h1>
-      <p class="subtitle">Career Intelligence Assistant — upload your resume and job descriptions to get grounded answers about fit, skill gaps, and interview prep.</p>
+      <p class="subtitle">Career Intelligence Assistant</p>
     </header>
 
-    <section class="panel" id="resume-panel">
-      <h2><span class="step">1</span> Upload your resume</h2>
-      <div class="upload-row">
-        <input type="file" id="resume-input" accept=".pdf,.txt,.md" />
-        <button id="resume-upload-btn">Upload</button>
-      </div>
-      <div id="resume-status" class="status"></div>
-      <div id="resume-skills" class="chips"></div>
-    </section>
+    <main class="layout">
+      <aside class="upload-sidebar">
+        <section class="panel" id="resume-panel">
+          <h2><span class="step">1</span> Upload your resume</h2>
+          <div class="upload-row">
+            <input type="file" id="resume-input" accept=".pdf,.txt,.md" />
+            <button id="resume-upload-btn">Upload</button>
+          </div>
+          <div id="resume-status" class="status"></div>
+          <div id="resume-skills" class="chips"></div>
+        </section>
 
-    <section class="panel" id="jobs-panel">
-      <h2><span class="step">2</span> Upload job description(s)</h2>
-      <div class="upload-row">
-        <input type="file" id="job-input" accept=".pdf,.txt,.md" />
-        <button id="job-upload-btn">Add job</button>
-      </div>
-      <div id="job-status" class="status"></div>
-      <div id="job-list" class="job-list"></div>
-    </section>
+        <section class="panel" id="jobs-panel">
+          <h2><span class="step">2</span> Upload job description(s)</h2>
+          <div class="upload-row">
+            <input type="file" id="job-input" accept=".pdf,.txt,.md" />
+            <button id="job-upload-btn">Add job</button>
+          </div>
+          <div id="job-status" class="status"></div>
+          <div id="job-list" class="job-list"></div>
+        </section>
+      </aside>
 
-    <section class="panel" id="chat-panel">
-      <h2><span class="step">3</span> Ask questions</h2>
-      <div id="chat-locked" class="status">Upload a resume and at least one job description to unlock chat.</div>
-      <div id="chat-window" class="chat-window hidden"></div>
-      <form id="chat-form" class="chat-form hidden">
-        <input type="text" id="chat-input" placeholder="e.g. What skills am I missing for Job #1?" autocomplete="off" />
-        <button type="submit">Send</button>
-      </form>
-    </section>
+      <section class="panel chat-panel" id="chat-panel">
+        <h2><span class="step">3</span> Ask questions</h2>
+        <div id="chat-locked" class="status chat-locked">Upload a resume and at least one job description to unlock chat.</div>
+        <div id="chat-window" class="chat-window hidden"></div>
+        <form id="chat-form" class="chat-form hidden">
+          <input type="text" id="chat-input" placeholder="e.g. What skills am I missing for Job #1?" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+    </main>
   </div>
 
   <script src="app.js"></script>
