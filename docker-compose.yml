@@ -1,0 +1,16 @@
+services:
+  roleread:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8420:8420"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CHAT_MODEL=${CHAT_MODEL:-gpt-4o-mini}
+      - EXTRACTION_MODEL=${EXTRACTION_MODEL:-gpt-4o-mini}
+    volumes:
+      - chroma_data:/data/chroma_data
+
+volumes:
+  chroma_data:

@@ -1,0 +1,13 @@
+backend/.venv/
+backend/.env
+backend/chroma_data/
+backend/tests/
+backend/pytest.ini
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.DS_Store
+PLAN.md
+NOTES.md
+docs/
