@@ -43,6 +43,37 @@ def _embed_skills(skills: list[str]) -> dict[str, list[float]]:
     return dict(zip(skills, vectors))
 
 
+# Maps the doc_type param used internally ("resume" / "job") to the document_type
+# classification values extract_profile's LLM call actually returns ("resume" / "job_description").
+_EXPECTED_DOCUMENT_TYPE = {"resume": "resume", "job": "job_description"}
+_UPLOAD_LABEL = {"resume": "a resume", "job": "a job description"}
+
+
+def _reject_if_wrong_document_type(profile, doc_type: str) -> None:
+    """Content-based upload validation: reject a file that clearly isn't what it was
+    uploaded as (e.g. an invoice uploaded as a "resume"), based on what the extraction
+    LLM actually read in the document — not just its filename/extension.
+
+    Deliberately lenient when classification is unavailable (empty `document_type`, e.g. a
+    malformed LLM response) — never block an upload on an inconclusive signal, only on a
+    confident mismatch.
+    """
+    if not profile.document_type:
+        return
+    expected = _EXPECTED_DOCUMENT_TYPE[doc_type]
+    if profile.document_type == expected:
+        return
+    label = _UPLOAD_LABEL[doc_type]
+    if profile.document_type == "other":
+        detail = (
+            f"This file doesn't look like {label}. {profile.summary or 'Please upload the correct document.'}"
+        )
+    else:
+        other_label = _UPLOAD_LABEL["job" if doc_type == "resume" else "resume"]
+        detail = f"This file looks like {other_label}, not {label}. Please upload {label} instead."
+    raise HTTPException(status_code=400, detail=detail)
+
+
 async def _read_and_validate(file: UploadFile) -> bytes:
     if not is_allowed_filename(file.filename or ""):
         raise HTTPException(status_code=400, detail="Only .pdf, .txt, and .md files are supported.")
@@ -65,6 +96,7 @@ async def upload_resume(file: UploadFile, session: SessionState = Depends(get_se
     chunks = chunk_text(text)
     doc_id = new_doc_id()
     profile = extract_profile(text, doc_type="resume")
+    _reject_if_wrong_document_type(profile, doc_type="resume")
     skill_embeddings = _embed_skills(profile.skills)
 
     with session.lock:
@@ -106,6 +138,7 @@ async def upload_job(file: UploadFile, session: SessionState = Depends(get_sessi
     chunks = chunk_text(text)
     doc_id = new_doc_id()
     profile = extract_profile(text, doc_type="job")
+    _reject_if_wrong_document_type(profile, doc_type="job")
     skill_embeddings = _embed_skills(profile.skills)
 
     with session.lock:

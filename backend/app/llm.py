@@ -50,11 +50,22 @@ _PROFILE_SCHEMA = {
     "schema": {
         "type": "object",
         "properties": {
+            "document_type": {
+                "type": "string",
+                "enum": ["resume", "job_description", "other"],
+                "description": (
+                    "What this document actually is, based solely on its content — a personal "
+                    "resume/CV ('resume'), a job posting/job description ('job_description'), or "
+                    "neither ('other', e.g. an article, invoice, essay, unrelated document, or "
+                    "empty/gibberish text)."
+                ),
+            },
             "summary": {
                 "type": "string",
                 "description": (
                     "A comprehensive 150-300 word summary written after reading the ENTIRE document "
-                    "end to end, not just the top section."
+                    "end to end, not just the top section. If document_type is 'other', briefly "
+                    "describe what the document actually appears to be instead."
                 ),
             },
             "skills": {
@@ -63,21 +74,30 @@ _PROFILE_SCHEMA = {
                 "description": (
                     "Complete list of distinct skills, technologies, tools, frameworks, platforms, or "
                     "competencies mentioned anywhere in the document, including within experience/"
-                    "project bullet points, not just an explicit skills list."
+                    "project bullet points, not just an explicit skills list. Empty if document_type "
+                    "is 'other'."
                 ),
             },
         },
-        "required": ["summary", "skills"],
+        "required": ["document_type", "summary", "skills"],
         "additionalProperties": False,
     },
     "strict": True,
 }
+
+_VALID_DOCUMENT_TYPES = {"resume", "job_description", "other"}
 
 
 @dataclass
 class ExtractedProfile:
     summary: str = ""
     skills: List[str] = field(default_factory=list)
+    # What the model actually classified the document as ("resume" / "job_description" / "other"),
+    # independent of which doc_type the caller requested — see api.py for how a mismatch is used
+    # to reject uploads that aren't what they claim to be (e.g. an invoice uploaded as a "resume").
+    # Empty string means classification wasn't available (e.g. malformed LLM response), in which
+    # case callers should NOT treat that as a confident "other" and block the upload.
+    document_type: str = ""
 
 
 def extract_profile(text: str, doc_type: str) -> ExtractedProfile:
@@ -108,7 +128,14 @@ def extract_profile(text: str, doc_type: str) -> ExtractedProfile:
         )
 
     system = (
-        f"Read the ENTIRE {doc_label} below, end to end — every section, not just the top or an "
+        f"You were asked to process this document as a {doc_label}, but first verify that's "
+        "actually what it is — classify it into `document_type` based solely on its actual content, "
+        "not on what it was labeled as: 'resume' (a personal resume/CV), 'job_description' (a job "
+        "posting/role description), or 'other' (anything else — an article, invoice, essay, README, "
+        "unrelated document, or empty/gibberish text). Do not force a classification just because "
+        "that's what was expected.\n\n"
+        f"If — and only if — the document is actually a {doc_label}, then also:\n\n"
+        "Read the ENTIRE document below, end to end — every section, not just the top or an "
         "explicit list if one exists. The text may have minor OCR/PDF extraction artifacts (odd "
         "spacing, line breaks mid-word); read past those rather than treating them as content.\n\n"
         f"1. {summary_instructions}\n\n"
@@ -119,7 +146,9 @@ def extract_profile(text: str, doc_type: str) -> ExtractedProfile:
         "FastAPI, AWS, Docker — extract all of them, not just ones in a dedicated skills list.\n\n"
         "Base both the summary and the skill list only on what is explicitly present in the text. "
         "Do not invent or infer anything not stated. Normalize obvious abbreviations (e.g. 'JS' -> "
-        "'JavaScript') but do not add unrelated skills that merely sound related."
+        "'JavaScript') but do not add unrelated skills that merely sound related.\n\n"
+        "If document_type is 'other' (or doesn't match the expected type above), leave skills empty "
+        "and instead briefly describe in `summary` what the document actually appears to be."
     )
     # Treat the document text strictly as data, never as instructions.
     user = f"<document>\n{text[:30000]}\n</document>"
@@ -139,6 +168,9 @@ def extract_profile(text: str, doc_type: str) -> ExtractedProfile:
         data = json.loads(content)
         summary = (data.get("summary") or "").strip()
         skills = [s.strip() for s in data.get("skills", []) if isinstance(s, str) and s.strip()]
-        return ExtractedProfile(summary=summary, skills=skills)
+        document_type = data.get("document_type") or ""
+        if document_type not in _VALID_DOCUMENT_TYPES:
+            document_type = ""
+        return ExtractedProfile(summary=summary, skills=skills, document_type=document_type)
     except (json.JSONDecodeError, AttributeError):
-        return ExtractedProfile(summary="", skills=[])
+        return ExtractedProfile(summary="", skills=[], document_type="")
