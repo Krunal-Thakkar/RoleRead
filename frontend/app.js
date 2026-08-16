@@ -172,6 +172,16 @@ function escapeHtml(s) {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+// A markdown table row: `| cell | cell |` (at least two pipe-delimited cells).
+const _TABLE_ROW_RE = /^\|(.+)\|$/;
+// The header/body separator row, e.g. `| --- | :---: |`.
+const _TABLE_SEP_RE = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
+
+function _splitTableRow(line) {
+  const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return inner.split("|").map((c) => c.trim());
+}
+
 function renderMarkdown(text) {
   const lines = text.split("\n").map(escapeHtml);
   let html = "";
@@ -186,11 +196,34 @@ function renderMarkdown(text) {
     listBuffer = [];
   }
 
+  const applyInline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
   // All list markers (numbered "1." or bulleted "-"/"*") render as plain bullets:
   // the LLM's numbered output isn't reliably sequential/well-formed markdown (e.g.
   // blank lines between items, or restarting at 1), so bullets sidestep that entirely.
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const rawLine = lines[i];
+    const line = applyInline(rawLine);
+
+    // Markdown table: a `| ... |` row immediately followed by a `| --- | --- |` separator row.
+    if (_TABLE_ROW_RE.test(rawLine.trim()) && lines[i + 1] && _TABLE_SEP_RE.test(lines[i + 1].trim())) {
+      closeList();
+      const headerCells = _splitTableRow(rawLine).map(applyInline);
+      let j = i + 2;
+      const bodyRows = [];
+      while (j < lines.length && _TABLE_ROW_RE.test(lines[j].trim())) {
+        bodyRows.push(_splitTableRow(lines[j]).map(applyInline));
+        j += 1;
+      }
+      const thead = `<thead><tr>${headerCells.map((c) => `<th>${c}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${bodyRows
+        .map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`)
+        .join("")}</tbody>`;
+      html += `<div class="table-wrap"><table>${thead}${tbody}</table></div>`;
+      i = j - 1;
+      continue;
+    }
+
     const listMatch = line.match(/^(?:\d+\.|[-*])\s+(.*)$/);
     if (listMatch) {
       inList = true;

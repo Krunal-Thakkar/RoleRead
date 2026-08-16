@@ -275,6 +275,46 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+.msg.assistant:has(.table-wrap) {
+  max-width: 100%;
+}
+
+.table-wrap {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.msg table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.msg th,
+.msg td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: normal;
+}
+
+.msg thead th {
+  background: #232840;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.msg tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.msg tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .msg p {
   margin: 0.35em 0;
 }
