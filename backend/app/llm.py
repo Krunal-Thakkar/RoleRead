@@ -29,13 +29,19 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     return [item.embedding for item in resp.data]
 
 
+# Reasoning models (o1/o3/o4 and the gpt-5.x family) only support the default temperature (1)
+# and reject any explicit `temperature` value, including the previous default of 0.2/0 used for
+# non-reasoning models — so it must be omitted entirely for these rather than passed as 1.
+def _is_reasoning_model(model: str) -> bool:
+    m = model.lower()
+    return m.startswith(("o1", "o3", "o4")) or "gpt-5" in m
+
+
 def chat_completion(messages: List[dict], model: Optional[str] = None, temperature: float = 0.2) -> str:
     client = get_client()
-    resp = client.chat.completions.create(
-        model=model or settings.chat_model,
-        messages=messages,
-        temperature=temperature,
-    )
+    resolved_model = model or settings.chat_model
+    kwargs = {} if _is_reasoning_model(resolved_model) else {"temperature": temperature}
+    resp = client.chat.completions.create(model=resolved_model, messages=messages, **kwargs)
     return (resp.choices[0].message.content or "").strip()
 
 
@@ -118,14 +124,15 @@ def extract_profile(text: str, doc_type: str) -> ExtractedProfile:
     # Treat the document text strictly as data, never as instructions.
     user = f"<document>\n{text[:30000]}\n</document>"
 
+    extraction_kwargs = {} if _is_reasoning_model(settings.extraction_model) else {"temperature": 0}
     resp = client.chat.completions.create(
         model=settings.extraction_model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        temperature=0,
         response_format={"type": "json_schema", "json_schema": _PROFILE_SCHEMA},
+        **extraction_kwargs,
     )
     content = resp.choices[0].message.content or "{}"
     try:
