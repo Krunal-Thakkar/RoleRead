@@ -6,5 +6,6 @@ backend/chroma_data/
 .pytest_cache/
 .DS_Store
 PLAN.md
+NOTES.md
 backend/tests/
 backend/pytest.ini

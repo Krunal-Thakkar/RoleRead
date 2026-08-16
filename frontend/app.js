@@ -120,33 +120,52 @@ resumeUploadBtn.addEventListener("click", async () => {
   }
 });
 
+async function uploadOneJob(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const data = await apiFetch("/jobs", { method: "POST", body: formData });
+  jobCount += 1;
+  addJobCard(data);
+  return data;
+}
+
 jobUploadBtn.addEventListener("click", async () => {
   if (jobCount >= MAX_JOBS) {
     updateJobLimitUI();
     return;
   }
-  const file = jobInput.files[0];
-  if (!file) {
-    setStatus(jobStatus, "Choose a job description file first.", true);
+  const files = Array.from(jobInput.files || []);
+  if (!files.length) {
+    setStatus(jobStatus, "Choose one or more job description files first.", true);
     return;
   }
-  setStatus(jobStatus, "Processing...");
+  const allowed = files.slice(0, MAX_JOBS - jobCount);
+  const skipped = files.length - allowed.length;
+
   jobUploadBtn.disabled = true;
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const data = await apiFetch("/jobs", { method: "POST", body: formData });
-    jobCount += 1;
-    setStatus(jobStatus, `Processed: ${data.filename} as ${data.label}`);
-    addJobCard(data);
-    jobInput.value = "";
-    maybeUnlockChat();
-    updateJobLimitUI();
-  } catch (err) {
-    setStatus(jobStatus, `Error: ${err.message}`, true);
-  } finally {
-    jobUploadBtn.disabled = jobCount >= MAX_JOBS;
+  let succeeded = 0;
+  for (const file of allowed) {
+    setStatus(jobStatus, `Processing ${file.name} (${succeeded + 1}/${allowed.length})...`);
+    try {
+      const data = await uploadOneJob(file);
+      succeeded += 1;
+      setStatus(jobStatus, `Processed: ${data.filename} as ${data.label}`);
+    } catch (err) {
+      setStatus(jobStatus, `Error on ${file.name}: ${err.message}`, true);
+      break; // stop the batch on first failure, keep whatever succeeded so far
+    }
   }
+  if (skipped > 0) {
+    setStatus(
+      jobStatus,
+      `Processed ${succeeded} job(s). Skipped ${skipped} — max of ${MAX_JOBS} reached.`,
+      succeeded === 0
+    );
+  }
+  jobInput.value = "";
+  maybeUnlockChat();
+  updateJobLimitUI();
+  jobUploadBtn.disabled = jobCount >= MAX_JOBS;
 });
 
 function escapeHtml(s) {
@@ -156,29 +175,33 @@ function escapeHtml(s) {
 function renderMarkdown(text) {
   const lines = text.split("\n").map(escapeHtml);
   let html = "";
-  let inList = null; // 'ol' or 'ul'
+  let inList = false;
   let listBuffer = [];
 
   function closeList() {
     if (!inList) return;
     const items = listBuffer.map((s) => `<li>${s}</li>`).join("");
-    html += `<${inList}>${items}</${inList}>`;
-    inList = null;
+    html += `<ul>${items}</ul>`;
+    inList = false;
     listBuffer = [];
   }
 
-  for (const raw of lines) {
-    const line = raw.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
-    const ulMatch = line.match(/^[-*]\s+(.*)$/);
-    if (olMatch) {
-      if (inList !== "ol") { closeList(); inList = "ol"; }
-      listBuffer.push(olMatch[2]);
-    } else if (ulMatch) {
-      if (inList !== "ul") { closeList(); inList = "ul"; }
-      listBuffer.push(ulMatch[1]);
+  // All list markers (numbered "1." or bulleted "-"/"*") render as plain bullets:
+  // the LLM's numbered output isn't reliably sequential/well-formed markdown (e.g.
+  // blank lines between items, or restarting at 1), so bullets sidestep that entirely.
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const listMatch = line.match(/^(?:\d+\.|[-*])\s+(.*)$/);
+    if (listMatch) {
+      inList = true;
+      listBuffer.push(listMatch[1]);
     } else if (line.trim() === "") {
-      closeList();
+      // A blank line only ends the list if what follows isn't another list item
+      // (the LLM often inserts a blank line between list items).
+      const next = lines.slice(i + 1).find((l) => l.trim() !== "");
+      if (!inList || !next || !/^(?:\d+\.|[-*])\s+/.test(next)) {
+        closeList();
+      }
     } else {
       closeList();
       html += `<p>${line}</p>`;
