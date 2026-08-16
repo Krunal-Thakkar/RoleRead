@@ -7,5 +7,6 @@ backend/chroma_data/
 .DS_Store
 PLAN.md
 NOTES.md
+docs/
 backend/tests/
 backend/pytest.ini

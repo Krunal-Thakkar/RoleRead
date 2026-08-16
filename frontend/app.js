@@ -51,6 +51,7 @@ const chatLocked = document.getElementById("chat-locked");
 const chatWindow = document.getElementById("chat-window");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
+const chatSendBtn = document.getElementById("chat-send-btn");
 
 function setStatus(el, message, isError = false) {
   el.textContent = message;
@@ -260,6 +261,16 @@ function addMessage(role, text, sources) {
   }
   chatWindow.appendChild(msg);
   chatWindow.scrollTop = chatWindow.scrollHeight;
+  return msg;
+}
+
+function addThinkingIndicator() {
+  const msg = document.createElement("div");
+  msg.className = "msg assistant thinking";
+  msg.innerHTML = '<span class="thinking-dots"><span></span><span></span><span></span></span>';
+  chatWindow.appendChild(msg);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+  return msg;
 }
 
 chatForm.addEventListener("submit", async (e) => {
@@ -269,17 +280,22 @@ chatForm.addEventListener("submit", async (e) => {
   addMessage("user", question);
   chatInput.value = "";
   chatInput.disabled = true;
+  chatSendBtn.disabled = true;
+  const thinkingEl = addThinkingIndicator();
   try {
     const data = await apiFetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
     });
+    thinkingEl.remove();
     addMessage("assistant", data.answer, data.sources);
   } catch (err) {
+    thinkingEl.remove();
     addMessage("assistant", `Error: ${err.message}`);
   } finally {
     chatInput.disabled = false;
+    chatSendBtn.disabled = false;
     chatInput.focus();
   }
 });
